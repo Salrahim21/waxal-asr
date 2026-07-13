@@ -1,0 +1,82 @@
+# =============================================================================
+# WAXAL ASR — Default Configuration
+# =============================================================================
+# This file contains all configurable parameters for training, evaluation,
+# and inference. Override any value via CLI flags or by creating a new YAML
+# file that inherits from this one.
+# =============================================================================
+
+# ---- Model ----
+model:
+  model_id: "google/gemma-3n-E2B-it"
+  torch_dtype: "bfloat16"
+  device_map: "auto"
+
+# ---- Dataset ----
+dataset:
+  dataset_id: "google/WaxalNLP"
+  languages:
+    - "lug"
+    - "lin"
+    - "sna"
+  sample_rate: 16000
+  streaming: true
+  format_batch_size: 32
+
+# ---- Prompts ----
+prompts:
+  system_message: "You are an assistant that transcribes speech accurately."
+  user_message: "Please transcribe this audio."
+
+# ---- LoRA (PEFT) ----
+lora:
+  task_type: "CAUSAL_LM"
+  r: 8
+  alpha: 16
+  dropout: 0.0
+  target_modules:
+    - "v_proj"
+    - "o_proj"
+  bias: "none"
+  use_rslora: false
+  use_dora: false
+
+# ---- Training ----
+training:
+  output_dir: "./outputs"
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+  learning_rate: 1.0e-3
+  max_steps: 500
+  max_seq_length: 64
+  eval_steps: 100
+  logging_steps: 10
+  save_steps: 100
+  num_validation_examples: 200
+  shuffle_buffer_size: 1000
+  dataloader_num_workers: 2
+  packing: false
+  report_to: "none"
+
+# ---- Evaluation ----
+evaluation:
+  num_samples: 200
+  batch_size: 4
+  max_new_tokens: 128
+
+# ---- Inference ----
+inference:
+  max_new_tokens: 128
+  temperature: 1.0
+  do_sample: false
+
+# ---- Reproducibility ----
+seed: 42
+
+# ---- Submission ----
+submission:
+  test_csv: "./Test.csv"
+  sample_submission_csv: "./SampleSubmission.csv"
+  output_path: "./submission.csv"

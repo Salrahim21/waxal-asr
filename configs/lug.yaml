@@ -1,0 +1,14 @@
+# =============================================================================
+# WAXAL ASR — Luganda (lug) Language Override
+# =============================================================================
+# Inherits all defaults from configs/default.yaml.
+# Only overrides specific to Luganda training are listed here.
+# =============================================================================
+
+dataset:
+  languages:
+    - "lug"
+
+training:
+  output_dir: "./outputs/gemma3n-asr-lug"
+  max_steps: 500

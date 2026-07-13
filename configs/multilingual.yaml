@@ -1,0 +1,17 @@
+# =============================================================================
+# WAXAL ASR — Multilingual Training (all competition languages)
+# =============================================================================
+# Trains a single model on all three competition languages simultaneously.
+# =============================================================================
+
+dataset:
+  languages:
+    - "lug"
+    - "lin"
+    - "sna"
+
+training:
+  output_dir: "./outputs/gemma3n-asr-multilingual"
+  max_steps: 3000
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8

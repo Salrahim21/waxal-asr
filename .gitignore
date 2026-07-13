@@ -1,0 +1,71 @@
+# =============================================================================
+# WAXAL ASR — .gitignore
+# =============================================================================
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ---------- Virtual environments ----------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------- Jupyter ----------
+.ipynb_checkpoints/
+*.ipynb_metadata/
+
+# ---------- IDE ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- Model artifacts ----------
+models/*.bin
+models/*.safetensors
+models/*.pt
+models/*.pth
+models/*.onnx
+models/*/
+
+# ---------- Training outputs ----------
+outputs/
+experiments/*/checkpoints/
+wandb/
+runs/
+*.log
+
+# ---------- Data (keep CSVs for competition, ignore large audio) ----------
+data/audio/
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# ---------- Submission (keep sample, ignore generated) ----------
+submission_*.csv
+
+# ---------- Environment / secrets ----------
+.env
+.env.*
+*.pem
+*.key
+
+# ---------- Misc ----------
+*.cache/
+huggingface/
+.huggingface/

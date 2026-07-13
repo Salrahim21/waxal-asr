@@ -1,0 +1,14 @@
+# =============================================================================
+# WAXAL ASR — Shona (sna) Language Override
+# =============================================================================
+# Inherits all defaults from configs/default.yaml.
+# Only overrides specific to Shona training are listed here.
+# =============================================================================
+
+dataset:
+  languages:
+    - "sna"
+
+training:
+  output_dir: "./outputs/gemma3n-asr-sna"
+  max_steps: 500

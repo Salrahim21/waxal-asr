@@ -1,0 +1,21 @@
+# =============================================================================
+# WAXAL ASR — Conda Environment
+# =============================================================================
+# Create with: conda env create -f environment.yml
+# Activate  : conda activate waxal-asr
+# =============================================================================
+
+name: waxal-asr
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.12
+  - pip
+  - cudatoolkit=12.1
+
+  - pip:
+    - -r requirements.txt
