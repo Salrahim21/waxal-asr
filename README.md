@@ -1,6 +1,15 @@
 # WAXAL ASR — Gemma 3n Fine-Tuning for African Language Speech Recognition
 
+![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.1+-ee4c2c?logo=pytorch&logoColor=white)
+![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-ffd21e?logo=huggingface&logoColor=black)
+![License](https://img.shields.io/badge/License-Apache%202.0-green)
+![Competition](https://img.shields.io/badge/Zindi-WAXAL%20Challenge-orange)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+
 Fine-tune Google's [Gemma 3n](https://huggingface.co/google/gemma-3n-E2B-it) multimodal model for Automatic Speech Recognition (ASR) on African languages, built for the [Google Research WAXAL Challenge](https://zindi.africa/) on the Zindi platform.
+
+---
 
 ## Motivation
 
@@ -19,6 +28,72 @@ The WAXAL African Language ASR Challenge asks participants to build speech recog
 **Evaluation metric:** Word Error Rate (WER) — lower is better.
 
 **Submission format:** CSV with columns `ID` and `Target` (predicted transcription).
+
+## Architecture
+
+```
+                         ┌─────────────────────────────┐
+                         │      YAML Configuration      │
+                         │   configs/default.yaml + override │
+                         └──────────────┬──────────────┘
+                                        │
+                    ┌───────────────────┼───────────────────┐
+                    ▼                   ▼                   ▼
+            ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+            │  WaxalNLP    │   │   Gemma 3n   │   │  Experiment  │
+            │  Dataset     │   │   + LoRA     │   │  Tracker     │
+            │  (Streaming) │   │  (bfloat16)  │   │              │
+            └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
+                   │                  │                   │
+                   ▼                  ▼                   ▼
+            ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+            │ Chat Format  │   │  SFTTrainer  │   │   Registry   │
+            │ + Collator   │──▶│  + LoRA      │──▶│   + Plots    │
+            │              │   │              │   │   + Reports  │
+            └──────────────┘   └──────────────┘   └──────┬───────┘
+                                                         │
+                               ┌─────────────────────────┼────────┐
+                               ▼                         ▼        ▼
+                        ┌────────────┐           ┌────────────┐ ┌──────┐
+                        │ Evaluation │           │   Error    │ │ HTML │
+                        │ WER / CER  │           │  Analysis  │ │Report│
+                        └─────┬──────┘           └────────────┘ └──────┘
+                              │
+                              ▼
+                       ┌─────────────┐
+                       │ submission  │
+                       │    .csv     │
+                       └─────────────┘
+```
+
+## Experiment Workflow
+
+```
+python train.py --config configs/sna.yaml --name "exp-001"
+       │
+       ├──▶ experiments/exp-001/
+       │       ├── config.yaml          # Frozen config snapshot
+       │       ├── environment.json     # Software + GPU versions
+       │       ├── logs/
+       │       │   └── training_log.json
+       │       ├── plots/
+       │       │   ├── training_loss.png
+       │       │   └── eval_metrics.png
+       │       ├── predictions/
+       │       │   └── predictions_eval.json
+       │       ├── checkpoints/
+       │       └── metrics_eval.json
+       │
+       └──▶ experiments/experiment_registry.csv   # Auto-appended
+```
+
+## Benchmark Results
+
+| Experiment | Model | Languages | Steps | LR | LoRA r | WER | CER |
+|------------|-------|-----------|-------|----|--------|-----|-----|
+| Baseline (starter) | gemma-3n-E2B-it | sna | 500 | 1e-3 | 8 | 52.36% | 14.38% |
+
+> Results will be updated as experiments are run.
 
 ## Dataset
 
@@ -53,22 +128,27 @@ waxal-asr/
 │   ├── __init__.py
 │   ├── config.py             # YAML loading and deep-merge logic
 │   ├── utils.py              # Seed, logging, GPU info, memory reporting
+│   ├── logging_utils.py      # Rich colored logging, GPU bars, timers
 │   ├── preprocessing.py      # Chat-message formatting for Gemma
 │   ├── dataset.py            # HuggingFace dataset loading and statistics
 │   ├── model.py              # Model and processor loading
 │   ├── collator.py           # Tokenisation and label masking
 │   ├── trainer.py            # LoRA config, training args, SFTTrainer setup
 │   ├── inference.py          # Batch and single-file transcription
-│   └── metrics.py            # WER, CER computation and persistence
+│   ├── metrics.py            # WER, CER computation and persistence
+│   ├── experiment.py         # Experiment tracking and registry
+│   ├── visualization.py      # Training curves, distributions, tables
+│   └── error_analysis.py     # Error breakdown and HTML report generation
 ├── notebooks/
 │   ├── waxal_asr_train.ipynb                 # Refactored training notebook
 │   └── Waxal_Challenge_Starter_Code.ipynb    # Original starter notebook
+├── experiments/              # Auto-managed experiment directories
+│   └── experiment_registry.csv
 ├── models/                   # Saved model checkpoints (gitignored)
 ├── outputs/                  # Training outputs and logs (gitignored)
-├── experiments/              # Experiment tracking artifacts
-├── reports/                  # Evaluation reports
+├── reports/                  # Generated evaluation reports
 ├── train.py                  # CLI training entry point
-├── evaluate.py               # CLI evaluation entry point
+├── evaluate.py               # CLI evaluation with error analysis
 ├── predict.py                # CLI single-file transcription
 ├── submit.py                 # CLI submission CSV generation
 ├── requirements.txt          # Python dependencies
@@ -83,7 +163,7 @@ waxal-asr/
 ### Option A: pip
 
 ```bash
-git clone https://github.com/your-username/waxal-asr.git
+git clone https://github.com/Salrahim21/waxal-asr.git
 cd waxal-asr
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
@@ -105,6 +185,15 @@ Gemma models require accepting the [model license](https://huggingface.co/google
 huggingface-cli login
 ```
 
+### Optional: W&B or TensorBoard
+
+```bash
+pip install wandb       # For Weights & Biases
+pip install tensorboard  # For TensorBoard
+```
+
+Set `training.report_to: "wandb"` or `"tensorboard"` in your config YAML.
+
 ## Quick Start
 
 ### Train on Shona (single language)
@@ -113,13 +202,19 @@ huggingface-cli login
 python train.py --config configs/sna.yaml
 ```
 
+### Train with experiment tracking
+
+```bash
+python train.py --config configs/sna.yaml --name "exp-sna-lr5e4" --notes "Testing lower LR"
+```
+
 ### Train on all competition languages
 
 ```bash
 python train.py --config configs/multilingual.yaml
 ```
 
-### Evaluate
+### Evaluate with error analysis
 
 ```bash
 python evaluate.py --config configs/sna.yaml --split test
@@ -149,6 +244,7 @@ All training hyperparameters are defined in `configs/default.yaml` and can be ov
 | `training.learning_rate` | 1e-3 | Peak learning rate |
 | `training.per_device_train_batch_size` | 2 | Batch size per GPU |
 | `training.gradient_accumulation_steps` | 8 | Effective batch size = 2 * 8 = 16 |
+| `training.report_to` | `"none"` | Set to `"wandb"` or `"tensorboard"` |
 | `lora.r` | 8 | LoRA rank |
 | `lora.alpha` | 16 | LoRA scaling factor |
 | `lora.target_modules` | `[v_proj, o_proj]` | Adapted attention projections |
@@ -157,6 +253,36 @@ All training hyperparameters are defined in `configs/default.yaml` and can be ov
 
 ```bash
 python train.py --config configs/sna.yaml --max-steps 3000 --learning-rate 5e-4
+```
+
+## Experiment Tracking
+
+Every training run automatically creates an experiment directory under `experiments/` containing:
+
+| Artifact | Description |
+|----------|-------------|
+| `config.yaml` | Frozen copy of the full merged config |
+| `environment.json` | Python, PyTorch, CUDA, GPU info, git commit hash |
+| `logs/training_log.json` | Per-step metrics (loss, eval_loss, etc.) |
+| `plots/training_loss.png` | Loss curve with EMA smoothing |
+| `plots/eval_metrics.png` | WER/CER validation curves |
+| `metrics_eval.json` | Final evaluation metrics |
+| `predictions/` | Reference vs. prediction JSON files |
+
+The global registry at `experiments/experiment_registry.csv` is auto-appended after each run for cross-experiment comparison.
+
+## Error Analysis
+
+After evaluation, an HTML report is generated with:
+- Summary statistics (mean/median/std WER)
+- Highest-WER samples (worst predictions)
+- Lowest-WER samples (best predictions)
+- Longest and shortest transcript analysis
+- Most common substitutions, insertions, and deletions
+
+```bash
+python evaluate.py --config configs/sna.yaml
+# Open: outputs/eval/error_report.html
 ```
 
 ## Inference
@@ -173,42 +299,20 @@ Output:
 [audio2.flac] Amaato abali gali ku mazzi...
 ```
 
-## Evaluation
-
-Metrics computed:
-- **WER** (Word Error Rate): primary competition metric
-- **CER** (Character Error Rate): important for morphologically rich languages
-
-Results are saved as JSON and prediction examples are stored for manual inspection:
-
-```bash
-python evaluate.py --config configs/sna.yaml --num-samples 500
-```
-
-Outputs:
-- `outputs/eval/metrics.json` — WER and CER values
-- `outputs/eval/predictions.json` — side-by-side reference vs. prediction examples
-
-## Experiment Tracking
-
-Each experiment configuration can be version-controlled as a YAML file in `configs/`. To run a new experiment:
-
-1. Copy `configs/default.yaml` to `configs/experiment_name.yaml`
-2. Modify the parameters you want to change
-3. Run: `python train.py --config configs/experiment_name.yaml`
-
-Metrics are automatically saved to the output directory for comparison.
-
 ## Roadmap
 
-- [ ] Add WandB / TensorBoard integration via `report_to` config
-- [ ] Implement learning rate scheduling (cosine annealing with warmup)
-- [ ] Add audio data augmentation (speed perturbation, noise injection)
+- [x] Experiment tracking with auto-registry
+- [x] Rich colored console logging with GPU memory bars
+- [x] Training loss and validation metric visualization
+- [x] Error analysis with HTML reports
+- [x] W&B and TensorBoard support (optional)
+- [x] Reproducibility snapshots (git hash, env info, frozen configs)
+- [ ] Learning rate scheduling (cosine annealing with warmup)
+- [ ] Audio data augmentation (speed perturbation, noise injection)
 - [ ] Support Gemma 4n (`google/gemma-4n-E4B-it`) for higher capacity
 - [ ] Multi-GPU training via DeepSpeed / FSDP
 - [ ] Quantised inference (4-bit / 8-bit) for deployment
 - [ ] Ensemble decoding across language-specific and multilingual models
-- [ ] Language identification to auto-route test examples
 
 ## Future Improvements
 

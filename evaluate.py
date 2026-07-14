@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """WAXAL ASR — Evaluation Script.
 
-Runs inference on a test or validation split and computes WER / CER.
+Runs inference on a test or validation split, computes WER / CER,
+performs error analysis, generates visualizations, and produces
+an HTML error analysis report.
 
 Usage::
 
     python evaluate.py                             # default config
     python evaluate.py --config configs/sna.yaml   # Shona
     python evaluate.py --split validation           # eval on val split
+    python evaluate.py --experiment experiments/20250714_120000_sna
 
 """
 
@@ -28,7 +31,14 @@ import torch
 
 from src.config import load_config
 from src.dataset import load_datasets_from_config
+from src.error_analysis import (
+    build_error_analysis,
+    generate_html_report,
+    save_error_analysis_json,
+)
+from src.experiment import Experiment
 from src.inference import transcribe_batch
+from src.logging_utils import log_gpu_memory_bar, setup_colored_logging
 from src.metrics import compute_all_metrics, save_metrics, save_prediction_examples
 from src.model import load_model_and_processor
 from src.utils import (
@@ -79,6 +89,18 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Directory for metrics and prediction outputs.",
     )
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        default=None,
+        help="Path to an existing experiment directory to save results into.",
+    )
+    parser.add_argument(
+        "--name",
+        type=str,
+        default=None,
+        help="Experiment name (creates a new experiment if --experiment is not set).",
+    )
     return parser.parse_args()
 
 
@@ -123,10 +145,17 @@ def run_evaluation(
 
 def main() -> None:
     """Entry point for evaluation."""
-    setup_logging()
     args = parse_args()
 
     config = load_config(override_path=args.config)
+    logging_cfg = config.get("logging", {})
+    experiment_cfg = config.get("experiment", {})
+
+    if logging_cfg.get("colored", True):
+        setup_colored_logging()
+    else:
+        setup_logging()
+
     set_seed(config["seed"])
     log_environment()
     log_gpu_info()
@@ -136,8 +165,20 @@ def main() -> None:
     batch_size = args.batch_size or eval_cfg["batch_size"]
     max_new_tokens = eval_cfg["max_new_tokens"]
 
-    output_dir = Path(args.output_dir or config["training"]["output_dir"]) / "eval"
+    # Determine output directory
+    if args.experiment:
+        output_dir = Path(args.experiment)
+    elif args.output_dir:
+        output_dir = Path(args.output_dir)
+    else:
+        output_dir = Path(config["training"]["output_dir"]) / "eval"
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create or reuse experiment
+    experiment: Experiment | None = None
+    if experiment_cfg.get("enabled", True) and not args.experiment:
+        experiment = Experiment.create(config=config, name=args.name)
+        output_dir = experiment.dir
 
     # ---- Load data ----
     splits = load_datasets_from_config(config)
@@ -146,7 +187,7 @@ def main() -> None:
     # ---- Load model ----
     model, processor = load_model_and_processor(config)
     device = get_device()
-    log_memory_usage()
+    log_gpu_memory_bar()
 
     # ---- Run evaluation ----
     logger.info("Evaluating on %s split (%d samples)...", args.split, num_samples)
@@ -170,10 +211,40 @@ def main() -> None:
     logger.info("  CER : %.2f%%", metrics["cer"] * 100)
 
     save_metrics(metrics, output_dir / "metrics.json")
-    save_prediction_examples(
-        references, predictions, output_dir / "predictions.json"
-    )
-    log_memory_usage()
+    save_prediction_examples(references, predictions, output_dir / "predictions.json")
+
+    # ---- Error analysis ----
+    logger.info("Running error analysis...")
+    analysis = build_error_analysis(references, predictions)
+    save_error_analysis_json(analysis, output_dir / "error_analysis.json")
+
+    # ---- HTML report ----
+    if experiment_cfg.get("generate_html_report", True):
+        report_title = f"WAXAL ASR Error Analysis — {lang_str} ({args.split})"
+        generate_html_report(analysis, output_dir / "error_report.html", title=report_title)
+        logger.info("HTML report: %s", output_dir / "error_report.html")
+
+    # ---- Visualization ----
+    if experiment_cfg.get("generate_plots", True):
+        try:
+            from src.visualization import plot_prediction_table
+            per_wer = analysis["per_example_wer"]
+            plot_prediction_table(
+                references, predictions, per_wer,
+                output_dir / "prediction_comparison.png",
+                title=f"Worst Predictions — {lang_str}",
+            )
+        except ImportError:
+            logger.warning("matplotlib not available — skipping prediction table plot.")
+
+    # ---- Register experiment ----
+    if experiment:
+        experiment.log_metrics(metrics, tag=args.split)
+        experiment.save_predictions(references, predictions, tag=args.split)
+        experiment.register(metrics)
+
+    log_gpu_memory_bar()
+    logger.info("Evaluation complete. Results saved to %s", output_dir)
 
 
 if __name__ == "__main__":

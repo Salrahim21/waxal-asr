@@ -8,6 +8,7 @@ ready for ``.train()``.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import datasets
@@ -69,6 +70,9 @@ def build_lora_config(config: dict[str, Any]) -> peft.LoraConfig:
 def build_training_args(config: dict[str, Any]) -> trl.SFTConfig:
     """Construct SFT training arguments from the YAML config.
 
+    Supports optional W&B and TensorBoard integration via
+    ``config["training"]["report_to"]``.
+
     Args:
         config: Full configuration dictionary.
 
@@ -79,6 +83,12 @@ def build_training_args(config: dict[str, Any]) -> trl.SFTConfig:
     seed = config["seed"]
     languages = config["dataset"]["languages"]
     run_name = f"gemma3n-asr-{'-'.join(languages)}"
+
+    report_to = t.get("report_to", "none")
+
+    # Resolve TensorBoard log dir
+    tb_cfg = config.get("tensorboard", {})
+    logging_dir = tb_cfg.get("log_dir") or (str(Path(t["output_dir"]) / "runs") if report_to == "tensorboard" else None)
 
     args = trl.SFTConfig(
         output_dir=t["output_dir"],
@@ -95,7 +105,7 @@ def build_training_args(config: dict[str, Any]) -> trl.SFTConfig:
         save_steps=t["save_steps"],
         bf16=torch.cuda.is_bf16_supported() if torch.cuda.is_available() else False,
         fp16=(not torch.cuda.is_bf16_supported()) if torch.cuda.is_available() else False,
-        report_to=t.get("report_to", "none"),
+        report_to=report_to,
         run_name=run_name,
         dataset_kwargs={"skip_prepare_dataset": True},
         remove_unused_columns=False,
@@ -103,13 +113,25 @@ def build_training_args(config: dict[str, Any]) -> trl.SFTConfig:
         packing=t.get("packing", False),
         dataloader_num_workers=t.get("dataloader_num_workers", 2),
         seed=seed,
+        **({"logging_dir": logging_dir} if logging_dir else {}),
     )
+
+    # Configure W&B if selected
+    if report_to == "wandb":
+        import os
+        wandb_cfg = config.get("wandb", {})
+        if wandb_cfg.get("project"):
+            os.environ.setdefault("WANDB_PROJECT", wandb_cfg["project"])
+        if wandb_cfg.get("entity"):
+            os.environ.setdefault("WANDB_ENTITY", wandb_cfg["entity"])
+
     logger.info(
-        "Training args: max_steps=%d, lr=%.1e, batch=%d, grad_accum=%d",
+        "Training args: max_steps=%d, lr=%.1e, batch=%d, grad_accum=%d, report_to=%s",
         args.max_steps,
         args.learning_rate,
         args.per_device_train_batch_size,
         args.gradient_accumulation_steps,
+        report_to,
     )
     return args
 

@@ -29,6 +29,13 @@ torchao>=0.1.0
 # Configuration
 pyyaml>=6.0
 
+# Visualization
+matplotlib>=3.7.0
+
+# Experiment tracking (optional — install only what you use)
+# wandb>=0.16.0
+# tensorboard>=2.14.0
+
 # Utilities
 numpy>=1.24.0
 tqdm>=4.65.0

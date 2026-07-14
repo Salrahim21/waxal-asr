@@ -72,6 +72,36 @@ inference:
   temperature: 1.0
   do_sample: false
 
+# ---- Experiment Tracking ----
+experiment:
+  enabled: true
+  base_dir: "./experiments"
+  name: null  # Auto-generated from timestamp + languages if null
+  notes: ""
+  save_predictions: true
+  save_training_log: true
+  generate_plots: true
+  generate_html_report: true
+
+# ---- Logging ----
+logging:
+  colored: true
+  log_gpu_memory_every_n_steps: 50
+  log_dataset_stats: true
+  log_eta: true
+
+# ---- Tracking Backend (optional) ----
+# Set training.report_to to "wandb" or "tensorboard" to enable.
+# For W&B: export WANDB_API_KEY=<your-key> or run `wandb login`
+# For TensorBoard: logs saved to <output_dir>/runs/
+wandb:
+  project: "waxal-asr"
+  entity: null  # Your W&B username or team
+  tags: []
+
+tensorboard:
+  log_dir: null  # Defaults to <output_dir>/runs/
+
 # ---- Reproducibility ----
 seed: 42
 
