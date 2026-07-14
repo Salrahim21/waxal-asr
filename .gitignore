@@ -49,14 +49,16 @@ wandb/
 runs/
 *.log
 
-# ---------- Data (keep CSVs for competition, ignore large audio) ----------
-data/audio/
+# ---------- Data (keep CSVs for competition, ignore large audio/parquet) ----------
+data/
 *.wav
 *.mp3
 *.flac
 *.ogg
+*.parquet
 
 # ---------- Submission (keep sample, ignore generated) ----------
+submissions/
 submission_*.csv
 
 # ---------- Environment / secrets ----------
@@ -64,6 +66,9 @@ submission_*.csv
 .env.*
 *.pem
 *.key
+
+# ---------- Claude Code ----------
+.claude/
 
 # ---------- Misc ----------
 *.cache/

@@ -127,10 +127,9 @@ def run_single_experiment(
         device = get_device()
         model.to(device)
 
-        splits = load_whisper_datasets(config, processor)
+        splits = load_whisper_datasets(config, processor, splits_to_load=("train", "validation"))
         train_ds = splits["train"]
         val_ds = splits["validation"]
-        test_ds = splits["test"]
 
         data_collator = WhisperDataCollator(processor)
 

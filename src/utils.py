@@ -67,7 +67,7 @@ def log_gpu_info() -> None:
 
     for i in range(torch.cuda.device_count()):
         props = torch.cuda.get_device_properties(i)
-        total_gb = props.total_mem / (1024 ** 3)
+        total_gb = props.total_memory / (1024 ** 3)
         logger.info(
             "GPU %d: %s — %.1f GB VRAM — CUDA %d.%d",
             i,

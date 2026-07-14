@@ -1,385 +1,169 @@
-# WAXAL ASR — Gemma 3n Fine-Tuning for African Language Speech Recognition
+# WAXAL ASR — Whisper for African Language Speech Recognition
 
-![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.1+-ee4c2c?logo=pytorch&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.6-ee4c2c?logo=pytorch&logoColor=white)
 ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-ffd21e?logo=huggingface&logoColor=black)
-![License](https://img.shields.io/badge/License-Apache%202.0-green)
 ![Competition](https://img.shields.io/badge/Zindi-WAXAL%20Challenge-orange)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 
-Fine-tune Google's [Gemma 3n](https://huggingface.co/google/gemma-3n-E2B-it) multimodal model for Automatic Speech Recognition (ASR) on African languages, built for the [Google Research WAXAL Challenge](https://zindi.africa/) on the Zindi platform.
+Speech recognition pipeline for the [Google Research WAXAL African Language ASR Challenge](https://zindi.africa/) on Zindi. Uses OpenAI's **Whisper Small** for zero-shot inference and optional fine-tuning on three African languages.
 
 ---
 
-## Motivation
-
-Sub-Saharan Africa is home to over 2,000 languages, most of which remain underserved by commercial ASR systems. The WaxalNLP dataset represents a significant step toward closing this gap, providing transcribed speech data for 27 African languages. This repository provides a modular, reproducible pipeline to fine-tune state-of-the-art multimodal models on this data.
-
 ## Competition Overview
 
-The WAXAL African Language ASR Challenge asks participants to build speech recognition models for three target languages:
+The WAXAL challenge asks participants to transcribe speech in three African languages:
 
-| Language | ISO Code | Training Examples | Test Examples |
-|----------|----------|-------------------|---------------|
-| Luganda  | `lug`    | 2,602             | 638           |
-| Lingala  | `lin`    | 9,937             | 1,866         |
-| Shona    | `sna`    | 10,489            | 1,749         |
+| Language | ISO Code | Train Examples | Test Examples |
+|----------|----------|----------------|---------------|
+| Luganda  | `lug`    | 2,602          | 638           |
+| Lingala  | `lin`    | 9,937          | 1,832         |
+| Shona    | `sna`    | 10,489         | 1,596         |
 
 **Evaluation metric:** Word Error Rate (WER) — lower is better.
 
-**Submission format:** CSV with columns `ID` and `Target` (predicted transcription).
-
-## Architecture
-
-```
-                         ┌─────────────────────────────┐
-                         │      YAML Configuration      │
-                         │   configs/default.yaml + override │
-                         └──────────────┬──────────────┘
-                                        │
-                    ┌───────────────────┼───────────────────┐
-                    ▼                   ▼                   ▼
-            ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-            │  WaxalNLP    │   │   Gemma 3n   │   │  Experiment  │
-            │  Dataset     │   │   + LoRA     │   │  Tracker     │
-            │  (Streaming) │   │  (bfloat16)  │   │              │
-            └──────┬───────┘   └──────┬───────┘   └──────┬───────┘
-                   │                  │                   │
-                   ▼                  ▼                   ▼
-            ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-            │ Chat Format  │   │  SFTTrainer  │   │   Registry   │
-            │ + Collator   │──▶│  + LoRA      │──▶│   + Plots    │
-            │              │   │              │   │   + Reports  │
-            └──────────────┘   └──────────────┘   └──────┬───────┘
-                                                         │
-                               ┌─────────────────────────┼────────┐
-                               ▼                         ▼        ▼
-                        ┌────────────┐           ┌────────────┐ ┌──────┐
-                        │ Evaluation │           │   Error    │ │ HTML │
-                        │ WER / CER  │           │  Analysis  │ │Report│
-                        └─────┬──────┘           └────────────┘ └──────┘
-                              │
-                              ▼
-                       ┌─────────────┐
-                       │ submission  │
-                       │    .csv     │
-                       └─────────────┘
-```
-
-## Experiment Workflow
-
-```
-python train.py --config configs/sna.yaml --name "exp-001"
-       │
-       ├──▶ experiments/exp-001/
-       │       ├── config.yaml          # Frozen config snapshot
-       │       ├── environment.json     # Software + GPU versions
-       │       ├── logs/
-       │       │   └── training_log.json
-       │       ├── plots/
-       │       │   ├── training_loss.png
-       │       │   └── eval_metrics.png
-       │       ├── predictions/
-       │       │   └── predictions_eval.json
-       │       ├── checkpoints/
-       │       └── metrics_eval.json
-       │
-       └──▶ experiments/experiment_registry.csv   # Auto-appended
-```
-
-## Benchmark Results
-
-| Experiment | Model | Languages | Steps | LR | LoRA r | WER | CER |
-|------------|-------|-----------|-------|----|--------|-----|-----|
-| Baseline (starter) | gemma-3n-E2B-it | sna | 500 | 1e-3 | 8 | 52.36% | 14.38% |
-
-> Results will be updated as experiments are run.
+**Submission format:** CSV with columns `ID` and `Target` (predicted transcription), 4,253 test samples total.
 
 ## Dataset
 
-The [WaxalNLP dataset](https://huggingface.co/datasets/google/WaxalNLP) provides:
-- ~1,846 hours of transcribed ASR data across 27 languages
-- ~565 hours of TTS recordings
-- CC-BY-4.0 license
+The [WaxalNLP dataset](https://huggingface.co/datasets/google/WaxalNLP) is hosted on HuggingFace. The Zindi competition CSVs (`Train.csv`, `Test.csv`) contain metadata only — audio must be downloaded from HuggingFace.
 
-Each example contains a raw audio waveform and its corresponding transcription. Audio is loaded via HuggingFace `datasets` in streaming mode and resampled to 16 kHz.
+**Test split parquet files (for zero-shot inference):**
 
-## Approach
+| Language | File | Size |
+|----------|------|------|
+| Luganda | [`lug-test-00000.parquet`](https://huggingface.co/datasets/google/WaxalNLP/resolve/main/data/ASR/lug/lug-test-00000.parquet) | ~216 MB |
+| Lingala | [`lin-test-00000.parquet`](https://huggingface.co/datasets/google/WaxalNLP/resolve/main/data/ASR/lin/lin-test-00000.parquet) | ~494 MB |
+| Shona | [`sna-test-00000.parquet`](https://huggingface.co/datasets/google/WaxalNLP/resolve/main/data/ASR/sna/sna-test-00000.parquet) | ~552 MB |
 
-This pipeline uses **LoRA** (Low-Rank Adaptation) to fine-tune Gemma 3n, which natively accepts audio input alongside text. The model processes speech end-to-end without a separate audio encoder.
+Total test data: **~1.3 GB**
 
-Key design decisions:
-- **LoRA** over full fine-tuning: reduces trainable parameters from ~2B to ~1M, enabling single-GPU training
-- **Streaming datasets**: avoids downloading hundreds of GB upfront
-- **Chat formatting**: wraps audio in the instruction-tuning format Gemma expects
-- **bfloat16 precision**: maintains numerical stability with half the memory of float32
+## Quick Start (Zero-Shot Submission)
+
+The fastest path to a submission file — no fine-tuning required.
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/Salrahim21/waxal-asr.git
+cd waxal-asr
+pip install -r requirements.txt
+```
+
+### 2. Download test data
+
+Download the 3 parquet files from the links above and place them in `data/`:
+
+```
+data/
+  lug-test-00000.parquet
+  lin-test-00000.parquet
+  sna-test-00000.parquet
+```
+
+### 3. Set up HuggingFace token
+
+Create a `.env` file in the project root:
+
+```
+HF_TOKEN=your_token_here
+```
+
+### 4. Run the notebook
+
+Open `notebooks/whisper_train_submit.ipynb` and run all cells. The notebook will:
+
+1. Load test audio from local parquet files
+2. Load Whisper Small (float16, ~500 MB GPU memory)
+3. Transcribe all 4,253 test samples zero-shot
+4. Write `submissions/submission_zero_shot.csv`
+5. Validate the submission against `SampleSubmission.csv`
+
+## Fine-Tuning (Optional)
+
+For better results, fine-tune Whisper on the training data using the automated experiment runner:
+
+```bash
+python run_all_experiments.py
+```
+
+This runs 3 experiment configurations:
+
+| Config | Epochs | LR | Decoding |
+|--------|--------|----|----------|
+| `baseline_v1` | 1 | 1e-5 | Greedy |
+| `baseline_v2` | 3 | 5e-6 | Greedy |
+| `baseline_v3` | 3 | 5e-6 | Beam search (5 beams) |
+
+Fine-tuning requires downloading the full training data (~5 GB).
 
 ## Repository Structure
 
 ```
 waxal-asr/
 ├── configs/
-│   ├── default.yaml          # Base configuration (all parameters)
-│   ├── lug.yaml              # Luganda-specific overrides
-│   ├── lin.yaml              # Lingala-specific overrides
-│   ├── sna.yaml              # Shona-specific overrides
-│   └── multilingual.yaml     # Train on all three languages
+│   ├── default.yaml              # Base configuration
+│   ├── baseline_v1.yaml          # 1 epoch, lr=1e-5, greedy
+│   ├── baseline_v2.yaml          # 3 epochs, lr=5e-6, greedy
+│   └── baseline_v3.yaml          # 3 epochs, lr=5e-6, beam search
 ├── src/
-│   ├── __init__.py
-│   ├── competition.py        # Competition compliance guards and audit
-│   ├── config.py             # YAML loading and deep-merge logic
-│   ├── utils.py              # Seed, logging, GPU info, memory reporting
-│   ├── logging_utils.py      # Rich colored logging, GPU bars, timers
-│   ├── preprocessing.py      # Chat-message formatting for Gemma
-│   ├── dataset.py            # HuggingFace dataset loading and statistics
-│   ├── model.py              # Model and processor loading
-│   ├── collator.py           # Tokenisation and label masking
-│   ├── trainer.py            # LoRA config, training args, SFTTrainer setup
-│   ├── inference.py          # Batch and single-file transcription
-│   ├── metrics.py            # WER, CER computation and persistence
-│   ├── experiment.py         # Experiment tracking and registry
-│   ├── visualization.py      # Training curves, distributions, tables
-│   └── error_analysis.py     # Error breakdown and HTML report generation
+│   ├── competition.py            # Competition compliance guards
+│   ├── config.py                 # YAML config loading
+│   ├── utils.py                  # Seed, logging, GPU info
+│   ├── logging_utils.py          # Colored logging
+│   ├── metrics.py                # WER, CER computation
+│   ├── whisper_model.py          # Whisper model loading
+│   ├── whisper_dataset.py        # Dataset loading and preprocessing
+│   ├── whisper_trainer.py        # Seq2Seq trainer setup
+│   ├── experiment.py             # Experiment tracking
+│   ├── visualization.py          # Training curves and plots
+│   └── error_analysis.py         # Error breakdown reports
 ├── notebooks/
-│   ├── waxal_asr_train.ipynb                 # Refactored training notebook
-│   └── Waxal_Challenge_Starter_Code.ipynb    # Original starter notebook
-├── experiments/              # Auto-managed experiment directories
-│   └── experiment_registry.csv
-├── models/                   # Saved model checkpoints (gitignored)
-├── outputs/                  # Training outputs and logs (gitignored)
-├── reports/                  # Generated evaluation reports
-├── train.py                  # CLI training entry point
-├── evaluate.py               # CLI evaluation with error analysis
-├── predict.py                # CLI single-file transcription
-├── submit.py                 # CLI submission CSV generation
-├── requirements.txt          # Python dependencies
-├── environment.yml           # Conda environment specification
-├── .gitignore
-├── LICENSE                   # Apache 2.0
+│   ├── whisper_train_submit.ipynb # Zero-shot inference notebook
+│   └── waxal_asr_train.ipynb     # Fine-tuning notebook
+├── data/                         # Local parquet files (gitignored)
+├── submissions/                  # Generated submission CSVs (gitignored)
+├── experiments/                  # Experiment outputs (gitignored)
+├── run_all_experiments.py        # Automated 3-experiment runner
+├── Train.csv                     # Zindi training metadata
+├── Test.csv                      # Zindi test IDs (4,253 samples)
+├── SampleSubmission.csv          # Submission template
+├── requirements.txt
+├── .env                          # HF token (gitignored)
 └── README.md
 ```
 
-## Installation
+## Technical Details
 
-### Option A: pip
-
-```bash
-git clone https://github.com/Salrahim21/waxal-asr.git
-cd waxal-asr
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-### Option B: Conda
-
-```bash
-conda env create -f environment.yml
-conda activate waxal-asr
-```
-
-### HuggingFace Authentication
-
-Gemma models require accepting the [model license](https://huggingface.co/google/gemma-3n-E2B-it). After accepting:
-
-```bash
-huggingface-cli login
-```
-
-### Optional: W&B or TensorBoard
-
-```bash
-pip install wandb       # For Weights & Biases
-pip install tensorboard  # For TensorBoard
-```
-
-Set `training.report_to: "wandb"` or `"tensorboard"` in your config YAML.
-
-## Quick Start
-
-### Train on Shona (single language)
-
-```bash
-python train.py --config configs/sna.yaml
-```
-
-### Train with experiment tracking
-
-```bash
-python train.py --config configs/sna.yaml --name "exp-sna-lr5e4" --notes "Testing lower LR"
-```
-
-### Train on all competition languages
-
-```bash
-python train.py --config configs/multilingual.yaml
-```
-
-### Evaluate with error analysis
-
-```bash
-python evaluate.py --config configs/sna.yaml --split test
-```
-
-### Transcribe a single audio file
-
-```bash
-python predict.py recording.wav --config configs/sna.yaml
-```
-
-### Generate submission CSV
-
-```bash
-python submit.py --config configs/default.yaml
-```
-
-## Training
-
-All training hyperparameters are defined in `configs/default.yaml` and can be overridden per-language or via CLI flags.
-
-### Key parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `training.max_steps` | 500 | Training iterations (increase to ~3000 for competition) |
-| `training.learning_rate` | 1e-3 | Peak learning rate |
-| `training.per_device_train_batch_size` | 2 | Batch size per GPU |
-| `training.gradient_accumulation_steps` | 8 | Effective batch size = 2 * 8 = 16 |
-| `training.report_to` | `"none"` | Set to `"wandb"` or `"tensorboard"` |
-| `lora.r` | 8 | LoRA rank |
-| `lora.alpha` | 16 | LoRA scaling factor |
-| `lora.target_modules` | `[v_proj, o_proj]` | Adapted attention projections |
-
-### CLI overrides
-
-```bash
-python train.py --config configs/sna.yaml --max-steps 3000 --learning-rate 5e-4
-```
-
-## Experiment Tracking
-
-Every training run automatically creates an experiment directory under `experiments/` containing:
-
-| Artifact | Description |
-|----------|-------------|
-| `config.yaml` | Frozen copy of the full merged config |
-| `environment.json` | Python, PyTorch, CUDA, GPU info, git commit hash |
-| `logs/training_log.json` | Per-step metrics (loss, eval_loss, etc.) |
-| `plots/training_loss.png` | Loss curve with EMA smoothing |
-| `plots/eval_metrics.png` | WER/CER validation curves |
-| `metrics_eval.json` | Final evaluation metrics |
-| `predictions/` | Reference vs. prediction JSON files |
-
-The global registry at `experiments/experiment_registry.csv` is auto-appended after each run for cross-experiment comparison.
-
-## Error Analysis
-
-After evaluation, an HTML report is generated with:
-- Summary statistics (mean/median/std WER)
-- Highest-WER samples (worst predictions)
-- Lowest-WER samples (best predictions)
-- Longest and shortest transcript analysis
-- Most common substitutions, insertions, and deletions
-
-```bash
-python evaluate.py --config configs/sna.yaml
-# Open: outputs/eval/error_report.html
-```
-
-## Inference
-
-The `predict.py` script accepts any audio file format supported by `librosa` (WAV, FLAC, MP3, OGG):
-
-```bash
-python predict.py audio1.wav audio2.flac --config configs/sna.yaml
-```
-
-Output:
-```
-[audio1.wav] Mudhuri mikuru mirefu yekuturikidzanwa...
-[audio2.flac] Amaato abali gali ku mazzi...
-```
+- **Model:** `openai/whisper-small` (241.7M parameters)
+- **Precision:** float16 (~500 MB GPU memory)
+- **Inference:** Greedy decoding, max 225 new tokens
+- **GPU tested:** NVIDIA RTX 4060 Laptop (8 GB VRAM)
+- **Dependencies:** PyTorch 2.6, Transformers 5.x, datasets 3.2.0
 
 ## Competition Compliance
 
-This repository includes built-in guards to prevent accidental misuse during the WAXAL competition.
+Built-in guards in `src/competition.py` ensure:
+- Only `google/WaxalNLP` dataset is used
+- Only competition languages (`lug`, `lin`, `sna`) are loaded
+- Only valid splits (`train`, `validation`, `test`) are accepted
 
-### COMPETITION_MODE
-
-A global flag in [`src/competition.py`](src/competition.py) controls all guards. When `COMPETITION_MODE = True` (the default):
-
-- **Dataset restriction** — Only `google/WaxalNLP` can be loaded. Any other dataset ID raises `ValueError`.
-- **Language restriction** — Only `lug` (Luganda), `lin` (Lingala), and `sna` (Shona) are permitted. Attempting to load any other language raises `ValueError`.
-- **Split restriction** — Only `train`, `validation`, and `test` splits are accepted.
-- **Config validation** — `validate_config()` runs automatically when any config is loaded via `load_config()`, checking the dataset ID and all configured languages before any data operation begins.
-
-Guards are enforced at every data loading site:
-
-| Module | Function | Guards |
-|--------|----------|--------|
-| `src/dataset.py` | `load_language_split()` | dataset ID, language, split |
-| `src/whisper_dataset.py` | `load_whisper_datasets()` | dataset ID, language, split |
-| `run_all_experiments.py` | `run_single_experiment()` | config validation, language, split |
-| `submit.py` | `main()` | config validation, language |
-| `src/config.py` | `load_config()` | full config validation |
-
-### Dataset Audit Report
-
-Run the audit programmatically:
-
-```python
-from src.competition import generate_dataset_audit
-from src.config import load_config
-
-config = load_config()
-generate_dataset_audit(config, "reports/dataset_audit.md")
-```
-
-This generates a markdown report at `reports/dataset_audit.md` documenting all data sources, languages, and compliance status.
-
-### Disabling Guards
-
-To use the pipeline outside the competition (e.g. for other WaxalNLP languages), set `COMPETITION_MODE = False` in `src/competition.py`. A warning will be logged.
-
-## Roadmap
-
-- [x] Experiment tracking with auto-registry
-- [x] Rich colored console logging with GPU memory bars
-- [x] Training loss and validation metric visualization
-- [x] Error analysis with HTML reports
-- [x] W&B and TensorBoard support (optional)
-- [x] Reproducibility snapshots (git hash, env info, frozen configs)
-- [ ] Learning rate scheduling (cosine annealing with warmup)
-- [ ] Audio data augmentation (speed perturbation, noise injection)
-- [ ] Support Gemma 4n (`google/gemma-4n-E4B-it`) for higher capacity
-- [ ] Multi-GPU training via DeepSpeed / FSDP
-- [ ] Quantised inference (4-bit / 8-bit) for deployment
-- [ ] Ensemble decoding across language-specific and multilingual models
-
-## Future Improvements
-
-- **Larger LoRA rank**: `r=16` or `r=32` with additional target modules (`q_proj`, `k_proj`) for more adapter capacity
-- **Longer training**: 3,000–10,000 steps with proper learning rate scheduling
-- **Multilingual pretraining**: train a shared model, then fine-tune per-language
-- **Text normalisation**: language-specific text cleaning for evaluation consistency
-- **Beam search decoding**: use `num_beams > 1` at inference time
+Set `COMPETITION_MODE = False` in `src/competition.py` to use the pipeline outside the competition.
 
 ## Acknowledgements
 
-- [Google Research](https://research.google/) for the WaxalNLP dataset and Gemma model family
+- [Google Research](https://research.google/) for the WaxalNLP dataset
+- [OpenAI](https://openai.com/) for the Whisper model family
 - [Zindi](https://zindi.africa/) for hosting the competition
-- [HuggingFace](https://huggingface.co/) for the Transformers, PEFT, TRL, and Datasets libraries
-- The original [starter notebook](https://huggingface.co/datasets/google/WaxalNLP) provided by the competition organisers
+- [HuggingFace](https://huggingface.co/) for the Transformers and Datasets libraries
 
 ## References
 
-1. Gemma Team. *Gemma 3 Technical Report*. Google DeepMind, 2025.
-2. Hu, E.J., et al. *LoRA: Low-Rank Adaptation of Large Language Models*. ICLR 2022.
-3. Morris, A.C., et al. *From WER and RIL to MER and WIL: improved evaluation measures for connected speech recognition*. INTERSPEECH 2004.
-4. WaxalNLP Dataset: [huggingface.co/datasets/google/WaxalNLP](https://huggingface.co/datasets/google/WaxalNLP)
+1. Radford, A., et al. *Robust Speech Recognition via Large-Scale Weak Supervision*. OpenAI, 2022.
+2. WaxalNLP Dataset: [huggingface.co/datasets/google/WaxalNLP](https://huggingface.co/datasets/google/WaxalNLP)
 
 ## License
 
 This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
 
-The WaxalNLP dataset is licensed under CC-BY-4.0. The Gemma model is subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms).
+The WaxalNLP dataset is licensed under CC-BY-4.0.

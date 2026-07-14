@@ -20,7 +20,7 @@ dataset:
     - "lin"
     - "sna"
   sample_rate: 16000
-  streaming: true
+  streaming: false
   format_batch_size: 32
 
 # ---- Prompts ----

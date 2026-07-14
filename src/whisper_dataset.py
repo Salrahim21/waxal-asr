@@ -95,8 +95,8 @@ def prepare_whisper_batch(
             return_tensors="np",
         ).input_ids[0]
 
-        all_features.append(features)
-        all_labels.append(labels)
+        all_features.append(features.tolist())
+        all_labels.append(labels.tolist())
 
     return {
         "input_features": all_features,
@@ -151,20 +151,22 @@ class WhisperDataCollator:
 def load_whisper_datasets(
     config: dict[str, Any],
     processor: transformers.WhisperProcessor,
-) -> dict[str, datasets.IterableDataset]:
+    splits_to_load: tuple[str, ...] = ("train", "validation"),
+) -> dict[str, Any]:
     """Load and preprocess WaxalNLP datasets for Whisper fine-tuning.
 
     Args:
         config: Full configuration dictionary.
         processor: The Whisper processor.
+        splits_to_load: Which splits to load (default: train and validation only).
 
     Returns:
-        Dict with ``"train"``, ``"validation"``, ``"test"`` datasets.
+        Dict with requested split datasets (Dataset or IterableDataset).
     """
     dataset_cfg = config["dataset"]
     languages = dataset_cfg["languages"]
     sample_rate = dataset_cfg["sample_rate"]
-    streaming = dataset_cfg.get("streaming", True)
+    streaming = dataset_cfg.get("streaming", False)
 
     _prep_fn = functools.partial(
         prepare_whisper_batch,
@@ -176,7 +178,7 @@ def load_whisper_datasets(
 
     validate_dataset_id(dataset_cfg["dataset_id"])
 
-    for split in ("train", "validation", "test"):
+    for split in splits_to_load:
         validate_split(split)
         split_datasets = []
         for lang in languages:
@@ -189,14 +191,26 @@ def load_whisper_datasets(
                 streaming=streaming,
             )
             ds = ds.cast_column("audio", datasets.Audio(sampling_rate=sample_rate))
+            # Dynamically determine columns to remove (avoid KeyError for missing columns)
+            try:
+                col_names = ds.column_names
+            except (AttributeError, TypeError):
+                col_names = None
+            keep = {"input_features", "labels", "transcription"}
+            if col_names:
+                cols_to_remove = [c for c in col_names if c not in keep]
+            else:
+                cols_to_remove = ["audio", "id", "language"]
             ds = ds.map(_prep_fn, batched=True, batch_size=16,
-                        remove_columns=["audio", "id", "language", "original_split"])
+                        remove_columns=cols_to_remove)
             split_datasets.append(ds)
 
         if len(split_datasets) == 1:
             result[split] = split_datasets[0]
-        else:
+        elif streaming:
             result[split] = datasets.interleave_datasets(split_datasets)
+        else:
+            result[split] = datasets.concatenate_datasets(split_datasets)
 
     logger.info("Whisper datasets loaded for languages=%s", languages)
     return result

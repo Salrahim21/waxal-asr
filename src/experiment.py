@@ -100,7 +100,7 @@ def collect_environment_info() -> dict[str, str]:
         info["cudnn_version"] = str(torch.backends.cudnn.version())
         for i in range(torch.cuda.device_count()):
             props = torch.cuda.get_device_properties(i)
-            info[f"gpu_{i}"] = f"{props.name} ({props.total_mem / (1024**3):.1f} GB)"
+            info[f"gpu_{i}"] = f"{props.name} ({props.total_memory / (1024**3):.1f} GB)"
 
     for pkg_name in ("transformers", "datasets", "peft", "trl", "jiwer", "numpy", "librosa"):
         try:

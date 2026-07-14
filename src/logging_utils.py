@@ -84,7 +84,7 @@ def gpu_memory_bar(device_idx: int = 0, bar_width: int = 30) -> str:
         return "No GPU available"
 
     alloc = torch.cuda.memory_allocated(device_idx)
-    total = torch.cuda.get_device_properties(device_idx).total_mem
+    total = torch.cuda.get_device_properties(device_idx).total_memory
     ratio = alloc / total if total > 0 else 0
     filled = int(bar_width * ratio)
     bar = "=" * filled + ">" + " " * (bar_width - filled - 1)
