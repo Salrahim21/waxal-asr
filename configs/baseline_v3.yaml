@@ -1,0 +1,53 @@
+# =============================================================================
+# Experiment: baseline_v3 — Beam search decoding
+# =============================================================================
+# Same model and training as baseline_v2, but inference uses beam search
+# (beam_size=5, length_penalty=1.0) instead of greedy decoding.
+# Goal: measure the effect of beam search on WER.
+# =============================================================================
+
+model:
+  model_id: "openai/whisper-small"
+  torch_dtype: "float16"
+  device_map: "auto"
+  architecture: "whisper"
+
+dataset:
+  languages:
+    - "lug"
+    - "lin"
+    - "sna"
+
+lora:
+  r: 0
+
+training:
+  output_dir: "./experiments/baseline_v3/checkpoints"
+  num_train_epochs: 3
+  max_steps: -1
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+  learning_rate: 5.0e-6
+  logging_steps: 25
+  save_steps: 500
+  eval_steps: 500
+  max_seq_length: 225
+  fp16: true
+  bf16: false
+  report_to: "none"
+
+evaluation:
+  num_samples: 200
+  batch_size: 4
+  max_new_tokens: 225
+
+inference:
+  max_new_tokens: 225
+  num_beams: 5
+  length_penalty: 1.0
+
+experiment:
+  name: "baseline_v3"
+  notes: "Whisper Small, 3 epochs, beam_size=5 — test beam search vs greedy"
