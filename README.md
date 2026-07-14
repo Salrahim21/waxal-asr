@@ -126,6 +126,7 @@ waxal-asr/
 │   └── multilingual.yaml     # Train on all three languages
 ├── src/
 │   ├── __init__.py
+│   ├── competition.py        # Competition compliance guards and audit
 │   ├── config.py             # YAML loading and deep-merge logic
 │   ├── utils.py              # Seed, logging, GPU info, memory reporting
 │   ├── logging_utils.py      # Rich colored logging, GPU bars, timers
@@ -298,6 +299,47 @@ Output:
 [audio1.wav] Mudhuri mikuru mirefu yekuturikidzanwa...
 [audio2.flac] Amaato abali gali ku mazzi...
 ```
+
+## Competition Compliance
+
+This repository includes built-in guards to prevent accidental misuse during the WAXAL competition.
+
+### COMPETITION_MODE
+
+A global flag in [`src/competition.py`](src/competition.py) controls all guards. When `COMPETITION_MODE = True` (the default):
+
+- **Dataset restriction** — Only `google/WaxalNLP` can be loaded. Any other dataset ID raises `ValueError`.
+- **Language restriction** — Only `lug` (Luganda), `lin` (Lingala), and `sna` (Shona) are permitted. Attempting to load any other language raises `ValueError`.
+- **Split restriction** — Only `train`, `validation`, and `test` splits are accepted.
+- **Config validation** — `validate_config()` runs automatically when any config is loaded via `load_config()`, checking the dataset ID and all configured languages before any data operation begins.
+
+Guards are enforced at every data loading site:
+
+| Module | Function | Guards |
+|--------|----------|--------|
+| `src/dataset.py` | `load_language_split()` | dataset ID, language, split |
+| `src/whisper_dataset.py` | `load_whisper_datasets()` | dataset ID, language, split |
+| `run_all_experiments.py` | `run_single_experiment()` | config validation, language, split |
+| `submit.py` | `main()` | config validation, language |
+| `src/config.py` | `load_config()` | full config validation |
+
+### Dataset Audit Report
+
+Run the audit programmatically:
+
+```python
+from src.competition import generate_dataset_audit
+from src.config import load_config
+
+config = load_config()
+generate_dataset_audit(config, "reports/dataset_audit.md")
+```
+
+This generates a markdown report at `reports/dataset_audit.md` documenting all data sources, languages, and compliance status.
+
+### Disabling Guards
+
+To use the pipeline outside the competition (e.g. for other WaxalNLP languages), set `COMPETITION_MODE = False` in `src/competition.py`. A warning will be logged.
 
 ## Roadmap
 

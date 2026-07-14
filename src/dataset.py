@@ -13,6 +13,12 @@ from typing import Any
 import datasets
 import numpy as np
 
+from src.competition import (
+    log_dataset_load_summary,
+    validate_dataset_id,
+    validate_language,
+    validate_split,
+)
 from src.preprocessing import format_batch
 
 logger = logging.getLogger(__name__)
@@ -42,8 +48,14 @@ def load_language_split(
 
     Returns:
         A formatted (Iterable)Dataset with ``messages`` column added.
+
+    Raises:
+        ValueError: If dataset_id, language, or split violate competition rules.
     """
-    logger.info("Loading WaxalNLP — language=%s, split=%s", language, split)
+    validate_dataset_id(dataset_id)
+    validate_language(language)
+    validate_split(split)
+    log_dataset_load_summary(dataset_id, language, split, streaming)
 
     ds = datasets.load_dataset(
         dataset_id,

@@ -41,6 +41,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from src.competition import validate_config, validate_dataset_id, validate_language, validate_split
 from src.config import load_config
 from src.error_analysis import build_error_analysis, generate_html_report, save_error_analysis_json
 from src.experiment import Experiment, collect_environment_info, get_git_commit_hash
@@ -100,6 +101,7 @@ def run_single_experiment(
 
     start_time = time.monotonic()
     config = load_config(override_path=config_path)
+    validate_config(config)
     seed = config["seed"]
     set_seed(seed)
 
@@ -180,6 +182,8 @@ def run_single_experiment(
 
         # Need raw val data with transcriptions for evaluation
         for lang in dataset_cfg["languages"]:
+            validate_language(lang)
+            validate_split("validation")
             raw_val = datasets.load_dataset(
                 dataset_cfg["dataset_id"],
                 name=f"{lang}_asr",
@@ -382,6 +386,8 @@ def _generate_submission(
     model.eval()
 
     for language in languages_in_test:
+        validate_language(language)
+        validate_split("test")
         lang_ids = {e["id"] for e in test_entries if e["language"] == language}
         logger.info("Generating predictions for %s (%d examples)...", language, len(lang_ids))
 

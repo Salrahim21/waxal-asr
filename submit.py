@@ -31,6 +31,7 @@ from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from src.competition import validate_config, validate_language
 from src.config import load_config
 from src.inference import transcribe_batch
 from src.model import load_model_and_processor
@@ -153,6 +154,7 @@ def main() -> None:
     args = parse_args()
 
     config = load_config(override_path=args.config)
+    validate_config(config)
     set_seed(config["seed"])
     log_gpu_info()
 
@@ -180,6 +182,7 @@ def main() -> None:
     predictions_map: dict[str, str] = {}
 
     for language in languages_in_test:
+        validate_language(language)
         lang_ids = {e["id"] for e in test_entries if e["language"] == language}
         logger.info("Processing language=%s (%d examples)", language, len(lang_ids))
 

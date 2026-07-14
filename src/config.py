@@ -14,6 +14,8 @@ from typing import Any
 
 import yaml
 
+from src.competition import validate_config as _validate_config
+
 logger = logging.getLogger(__name__)
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -69,5 +71,8 @@ def load_config(
                 target = target.setdefault(k, {})
             target[keys[-1]] = value
         logger.info("Applied %d CLI overrides", len(cli_overrides))
+
+    # Run competition compliance validation on the final merged config
+    _validate_config(config)
 
     return config

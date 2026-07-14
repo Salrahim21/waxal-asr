@@ -15,6 +15,13 @@ import numpy as np
 import torch
 import transformers
 
+from src.competition import (
+    log_dataset_load_summary,
+    validate_dataset_id,
+    validate_language,
+    validate_split,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -167,10 +174,14 @@ def load_whisper_datasets(
 
     result: dict[str, Any] = {}
 
+    validate_dataset_id(dataset_cfg["dataset_id"])
+
     for split in ("train", "validation", "test"):
+        validate_split(split)
         split_datasets = []
         for lang in languages:
-            logger.info("Loading WaxalNLP — language=%s, split=%s (Whisper)", lang, split)
+            validate_language(lang)
+            log_dataset_load_summary(dataset_cfg["dataset_id"], lang, split, streaming)
             ds = datasets.load_dataset(
                 dataset_cfg["dataset_id"],
                 name=f"{lang}_asr",
