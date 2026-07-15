@@ -6,7 +6,7 @@
 ![Competition](https://img.shields.io/badge/Zindi-WAXAL%20Challenge-orange)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 
-Speech recognition pipeline for the [Google Research WAXAL African Language ASR Challenge](https://zindi.africa/) on Zindi. Uses OpenAI's **Whisper Small** for zero-shot inference and optional fine-tuning on three African languages.
+Speech recognition pipeline for the [Google Research WAXAL African Language ASR Challenge](https://zindi.africa/) on Zindi. Uses OpenAI's **Whisper Large-V3** with beam search for zero-shot inference, heuristic ensembling, and optional LoRA fine-tuning on three African languages.
 
 ---
 
@@ -38,64 +38,68 @@ The [WaxalNLP dataset](https://huggingface.co/datasets/google/WaxalNLP) is hoste
 
 Total test data: **~1.3 GB**
 
-## Quick Start (Zero-Shot Submission)
+**Additional test shards (for 100% coverage):**
 
-The fastest path to a submission file — no fine-tuning required.
+| Language | File | Size |
+|----------|------|------|
+| Lingala | [`lin-test-00001.parquet`](https://huggingface.co/datasets/google/WaxalNLP/resolve/main/data/ASR/lin/lin-test-00001.parquet) | ~8.5 MB |
+| Shona | [`sna-test-00001.parquet`](https://huggingface.co/datasets/google/WaxalNLP/resolve/main/data/ASR/sna/sna-test-00001.parquet) | ~47 MB |
 
-### 1. Clone and install
+## Approaches
 
+This repo implements **4 tiers** of increasing complexity:
+
+### Tier 1+3: Whisper Large-V3 Zero-Shot + Beam Search (Recommended Start)
+
+The fastest path to a competitive submission — no training data needed.
+
+1. Clone and install:
 ```bash
 git clone https://github.com/Salrahim21/waxal-asr.git
 cd waxal-asr
 pip install -r requirements.txt
 ```
 
-### 2. Download test data
+2. Download test parquet files (links above) into `data/`
 
-Download the 3 parquet files from the links above and place them in `data/`:
-
-```
-data/
-  lug-test-00000.parquet
-  lin-test-00000.parquet
-  sna-test-00000.parquet
-```
-
-### 3. Set up HuggingFace token
-
-Create a `.env` file in the project root:
-
+3. Create `.env` with your HuggingFace token:
 ```
 HF_TOKEN=your_token_here
 ```
 
-### 4. Run the notebook
+4. Open `notebooks/whisper_train_submit.ipynb` and run all cells:
+   - Loads `whisper-large-v3` (1.55B params, ~3GB VRAM in float16)
+   - Beam search decoding (`num_beams=5`, `no_repeat_ngram_size=3`)
+   - Language-specific transcription (Swahili for Luganda, Lingala, Shona)
+   - Outputs `submissions/submission_large_v3.csv`
 
-Open `notebooks/whisper_train_submit.ipynb` and run all cells. The notebook will:
+### Tier 2: Ensemble (Small + Large-V3)
 
-1. Load test audio from local parquet files
-2. Load Whisper Small (float16, ~500 MB GPU memory)
-3. Transcribe all 4,253 test samples zero-shot
-4. Write `submissions/submission_zero_shot.csv`
-5. Validate the submission against `SampleSubmission.csv`
+Combines predictions from Whisper Small and Large-V3 using quality heuristics.
 
-## Fine-Tuning (Optional)
+1. Generate both submissions first (Tier 1 + original zero-shot)
+2. Open `notebooks/whisper_ensemble.ipynb` and run all cells
+3. Per-sample selection based on: garbled script detection, repetition analysis, emptiness, length
+4. Outputs `submissions/submission_ensemble.csv`
 
-For better results, fine-tune Whisper on the training data using the automated experiment runner:
+### Tier 4: LoRA Fine-Tuning
+
+Fine-tunes Whisper Large-V3 with LoRA on the full training set (~38K examples).
+
+1. Download training + validation parquet files into `data/` (~6.9 GB total)
+2. Open `notebooks/whisper_finetune.ipynb` and run all cells
+3. LoRA config: `r=32`, `alpha=64`, targets `q_proj, v_proj, k_proj, o_proj`
+4. Fits in 8GB VRAM with gradient checkpointing + batch_size=2
+5. 500 steps default, evaluates WER every 100 steps
+6. Outputs `submissions/submission_finetuned.csv`
+
+### Legacy: Script-Based Experiments
 
 ```bash
 python run_all_experiments.py
 ```
 
-This runs 3 experiment configurations:
-
-| Config | Epochs | LR | Decoding |
-|--------|--------|----|----------|
-| `baseline_v1` | 1 | 1e-5 | Greedy |
-| `baseline_v2` | 3 | 5e-6 | Greedy |
-| `baseline_v3` | 3 | 5e-6 | Beam search (5 beams) |
-
-Fine-tuning requires downloading the full training data (~5 GB).
+Runs 3 baseline configs (`baseline_v1`, `v2`, `v3`) with Whisper Small. Requires full training data download.
 
 ## Repository Structure
 
@@ -119,8 +123,10 @@ waxal-asr/
 │   ├── visualization.py          # Training curves and plots
 │   └── error_analysis.py         # Error breakdown reports
 ├── notebooks/
-│   ├── whisper_train_submit.ipynb # Zero-shot inference notebook
-│   └── waxal_asr_train.ipynb     # Fine-tuning notebook
+│   ├── whisper_train_submit.ipynb # Large-V3 zero-shot + beam search
+│   ├── whisper_ensemble.ipynb     # Ensemble small + large-v3
+│   ├── whisper_finetune.ipynb     # LoRA fine-tuning on training data
+│   └── waxal_asr_train.ipynb     # Legacy fine-tuning notebook
 ├── data/                         # Local parquet files (gitignored)
 ├── submissions/                  # Generated submission CSVs (gitignored)
 ├── experiments/                  # Experiment outputs (gitignored)
@@ -133,13 +139,18 @@ waxal-asr/
 └── README.md
 ```
 
+├── reports/
+│   ├── zero_shot_performance.md  # Analysis of zero-shot results
+│   └── day1_report.md            # Day 1 experiment report
+
 ## Technical Details
 
-- **Model:** `openai/whisper-small` (241.7M parameters)
-- **Precision:** float16 (~500 MB GPU memory)
-- **Inference:** Greedy decoding, max 225 new tokens
+- **Models:** `openai/whisper-small` (244M) and `openai/whisper-large-v3` (1.55B)
+- **Precision:** float16 (small: ~500 MB, large-v3: ~3 GB VRAM)
+- **Inference:** Beam search (5 beams), `no_repeat_ngram_size=3`, language-specific transcription
+- **Fine-tuning:** LoRA (r=32, alpha=64) with gradient checkpointing, fits 8GB VRAM
 - **GPU tested:** NVIDIA RTX 4060 Laptop (8 GB VRAM)
-- **Dependencies:** PyTorch 2.6, Transformers 5.x, datasets 3.2.0
+- **Dependencies:** PyTorch 2.6, Transformers 5.x, datasets 3.2.0, PEFT
 
 ## Competition Compliance
 
