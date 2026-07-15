@@ -135,13 +135,12 @@ waxal-asr/
 ├── Test.csv                      # Zindi test IDs (4,253 samples)
 ├── SampleSubmission.csv          # Submission template
 ├── requirements.txt
-├── .env                          # HF token (gitignored)
-└── README.md
-```
-
 ├── reports/
 │   ├── zero_shot_performance.md  # Analysis of zero-shot results
 │   └── day1_report.md            # Day 1 experiment report
+├── .env                          # HF token (gitignored)
+└── README.md
+```
 
 ## Technical Details
 

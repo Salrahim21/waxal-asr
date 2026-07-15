@@ -1,0 +1,5 @@
+experiment,model,beam_size,runtime,gpu_memory,submission_filename,leaderboard_score,notes
+zero_shot_baseline,openai/whisper-small,1,,,submission_zero_shot.csv,,First submission. Greedy decoding with language hints. 65% English hallucination before fix.
+beam_search_small,openai/whisper-small,5,,,submission_beam_small.csv,,Beam search + no_repeat_ngram + condition_on_prev_tokens=False
+large_v3_zero_shot,openai/whisper-large-v3,5,,,submission_large_v3.csv,,Large-V3 with same decoding as beam_search_small
+ensemble_v1,small+large-v3,5,,,submission_ensemble.csv,,Heuristic ensemble picking best per-sample prediction
