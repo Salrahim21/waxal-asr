@@ -1,0 +1,18 @@
+{
+  "python": "3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "pytorch": "2.6.0+cu126",
+  "cuda_available": "True",
+  "cuda_version": "12.6",
+  "cudnn_version": "90501",
+  "gpu_0": "NVIDIA GeForce RTX 4060 Laptop GPU (8.0 GB)",
+  "transformers": "5.13.1",
+  "datasets": "3.2.0",
+  "peft": "0.19.1",
+  "trl": "1.8.0",
+  "jiwer": "unknown",
+  "numpy": "2.2.6",
+  "librosa": "0.11.0",
+  "git_commit": "81c6c5e",
+  "git_status": "dirty"
+}

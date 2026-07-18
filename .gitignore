@@ -45,6 +45,7 @@ models/*/
 # ---------- Training outputs ----------
 outputs/
 experiments/*/checkpoints/
+experiments/finetuned/
 wandb/
 runs/
 *.log
